@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚠️ Behavioral Prediction System v3.2</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #020608;
+    --panel: #040d12;
+    --green: #00ff88;
+    --cyan: #00e5ff;
+    --red: #ff2244;
+    --yellow: #ffe600;
+    --dim: #0a2030;
+    --border: #0d3a50;
+    --text: #b0cdd8;
+    --glow-green: 0 0 10px #00ff8880, 0 0 30px #00ff8840;
+    --glow-cyan: 0 0 10px #00e5ff80, 0 0 30px #00e5ff40;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+    cursor: crosshair;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,230,255,0.015) 2px,
+      rgba(0,230,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Grid background */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.04) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  /* ── SCREENS ── */
+  .screen { display: none; animation: fadeIn 0.4s ease; }
+  .screen.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── HEADER ── */
+  .sys-header {
+    text-align: center;
+    margin-bottom: 50px;
+  }
+
+  .sys-badge {
+    display: inline-block;
+    background: var(--red);
+    color: #fff;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    padding: 4px 14px;
+    margin-bottom: 20px;
+    clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+    animation: pulse-badge 2s infinite;
+  }
+  @keyframes pulse-badge { 0%,100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+  .sys-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(22px, 5vw, 42px);
+    font-weight: 900;
+    color: var(--cyan);
+    text-shadow: var(--glow-cyan);
+    line-height: 1.1;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+
+  .sys-version {
+    font-size: 11px;
+    color: #3a7a90;
+    letter-spacing: 4px;
+  }
+
+  .sys-subtitle {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    color: #5a9aaa;
+    margin-top: 14px;
+    letter-spacing: 1px;
+  }
+
+  /* ── PANEL ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 32px;
+    position: relative;
+    margin-bottom: 20px;
+    box-shadow: inset 0 0 40px rgba(0,229,255,0.03);
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.5;
+  }
+
+  .panel-label {
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: var(--bg);
+    color: var(--cyan);
+    font-size: 10px;
+    letter-spacing: 3px;
+    padding: 0 8px;
+  }
+
+  /* ── WARNING BOX ── */
+  .warning-box {
+    border: 1px solid var(--yellow);
+    background: rgba(255,230,0,0.04);
+    padding: 16px 20px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .warning-icon { color: var(--yellow); font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .warning-text { font-size: 12px; color: #aa9900; line-height: 1.7; }
+
+  /* ── DATA LINES ── */
+  .data-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(13,58,80,0.5);
+    font-size: 12px;
+  }
+  .data-line:last-child { border-bottom: none; }
+  .data-key { color: #3a7a90; letter-spacing: 2px; font-size: 11px; }
+  .data-val { color: var(--green); font-size: 11px; }
+
+  /* ── START BUTTON ── */
+  .btn-start {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: 2px solid var(--cyan);
+    color: var(--cyan);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    padding: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    clip-path: polygon(12px 0%, 100% 0%, calc(100% - 12px) 100%, 0% 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-start::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--cyan);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: -1;
+  }
+  .btn-start:hover {
+    color: var(--bg);
+    box-shadow: var(--glow-cyan);
+  }
+  .btn-start:hover::before { transform: translateX(0); }
+
+  /* ── QUESTION SCREEN ── */
+  .q-progress {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 32px;
+    align-items: center;
+  }
+  .q-pip {
+    height: 3px;
+    flex: 1;
+    background: var(--dim);
+    border-radius: 1px;
+    transition: background 0.3s;
+  }
+  .q-pip.done { background: var(--green); }
+  .q-pip.active { background: var(--cyan); box-shadow: var(--glow-cyan); }
+
+  .q-number {
+    font-size: 10px;
+    color: #3a6070;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+
+  .q-text {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(18px, 3vw, 24px);
+    font-weight: 600;
+    color: #d0eaf5;
+    margin-bottom: 28px;
+    line-height: 1.4;
+  }
+
+  .q-options {
+    display: grid;
+    gap: 10px;
+  }
+
+  .q-opt {
+    background: var(--dim);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 14px 20px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    letter-spacing: 0.5px;
+  }
+  .q-opt-key {
+    color: var(--cyan);
+    font-size: 11px;
+    min-width: 20px;
+    opacity: 0.6;
+  }
+  .q-opt:hover {
+    background: rgba(0,229,255,0.08);
+    border-color: var(--cyan);
+    color: #fff;
+    transform: translateX(4px);
+  }
+  .q-opt.selected {
+    background: rgba(0,255,136,0.1);
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  /* ── SCAN SCREEN ── */
+  #screen-scan { text-align: center; }
+
+  .scan-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    letter-spacing: 4px;
+    color: var(--cyan);
+    margin-bottom: 40px;
+    animation: blink-text 1s infinite;
+  }
+  @keyframes blink-text { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .scan-circle {
+    width: 160px;
+    height: 160px;
+    margin: 0 auto 40px;
+    position: relative;
+  }
+  .scan-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    animation: spin 1.5s linear infinite;
+  }
+  .scan-ring:nth-child(1) {
+    border-top-color: var(--cyan);
+    animation-duration: 1.2s;
+  }
+  .scan-ring:nth-child(2) {
+    inset: 16px;
+    border-right-color: var(--green);
+    animation-duration: 1.8s;
+    animation-direction: reverse;
+  }
+  .scan-ring:nth-child(3) {
+    inset: 32px;
+    border-bottom-color: var(--red);
+    animation-duration: 2.4s;
+  }
+  .scan-percent {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--cyan);
+    text-shadow: var(--glow-cyan);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .scan-tasks {
+    text-align: left;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+  .scan-task {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(13,58,80,0.4);
+    font-size: 12px;
+    opacity: 0.3;
+    transition: opacity 0.4s, color 0.4s;
+  }
+  .scan-task.running { opacity: 1; color: var(--cyan); }
+  .scan-task.done { opacity: 1; color: var(--green); }
+  .task-icon { font-size: 14px; min-width: 20px; text-align: center; }
+  .task-bar {
+    margin-left: auto;
+    width: 80px;
+    height: 3px;
+    background: var(--dim);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .task-bar-fill {
+    height: 100%;
+    background: var(--green);
+    width: 0%;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 6px var(--green);
+  }
+
+  /* ── RESULT SCREEN ── */
+  .result-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .result-accuracy {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(48px, 10vw, 80px);
+    font-weight: 900;
+    color: var(--green);
+    text-shadow: var(--glow-green), 0 0 60px #00ff8840;
+    line-height: 1;
+  }
+  .result-label {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: #3a7a50;
+    margin-top: 6px;
+  }
+  .result-status {
+    display: inline-block;
+    background: rgba(0,255,136,0.1);
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-size: 11px;
+    letter-spacing: 3px;
+    padding: 5px 16px;
+    margin-top: 14px;
+  }
+
+  .predictions {
+    display: grid;
+    gap: 10px;
+    margin: 28px 0;
+  }
+  .pred-item {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: #c0dde8;
+    white-space: nowrap;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity 0.4s, transform 0.4s;
+  }
+  .pred-item.visible { opacity: 1; transform: translateX(0); }
+  .pred-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pred-check { color: var(--green); flex-shrink: 0; margin-top: 1px; font-size: 14px; }
+
+  .confidence-bar {
+    margin: 24px 0;
+  }
+  .conf-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #3a7a90;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+  .conf-track {
+    height: 6px;
+    background: var(--dim);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .conf-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--green));
+    box-shadow: 0 0 8px var(--green);
+    width: 0%;
+    transition: width 1.5s ease 0.5s;
+  }
+
+  /* Share card */
+  .share-section { margin-top: 32px; }
+  .share-card {
+    background: linear-gradient(135deg, #020d14, #040e18);
+    border: 1px solid var(--border);
+    padding: 24px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .share-card::before {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    background: radial-gradient(circle at 50% 50%, rgba(0,229,255,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .share-card-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--red);
+    margin-bottom: 12px;
+  }
+  .share-card-score {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 42px;
+    font-weight: 900;
+    color: var(--green);
+    text-shadow: var(--glow-green);
+  }
+  .share-card-text {
+    font-size: 12px;
+    color: #5a8090;
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+  .share-card-url {
+    font-size: 11px;
+    color: var(--cyan);
+    margin-top: 10px;
+    opacity: 0.6;
+  }
+
+  .btn-share {
+    display: block;
+    width: 100%;
+    background: linear-gradient(90deg, rgba(0,255,136,0.1), rgba(0,229,255,0.1));
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    letter-spacing: 3px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 10px;
+  }
+  .btn-share:hover {
+    background: linear-gradient(90deg, rgba(0,255,136,0.2), rgba(0,229,255,0.2));
+    box-shadow: var(--glow-green);
+  }
+
+  .btn-retry {
+    display: block;
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: #3a7a90;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-retry:hover { border-color: #3a7a90; color: var(--text); }
+
+  /* Bottom ticker */
+  .ticker {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.9);
+    border-top: 1px solid var(--border);
+    padding: 8px 0;
+    overflow: hidden;
+    z-index: 100;
+  }
+  .ticker-inner {
+    display: flex;
+    gap: 40px;
+    white-space: nowrap;
+    animation: ticker-scroll 30s linear infinite;
+  }
+  .ticker-item {
+    font-size: 10px;
+    color: #2a5060;
+    letter-spacing: 2px;
+    flex-shrink: 0;
+  }
+  .ticker-item span { color: var(--green); }
+  @keyframes ticker-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  /* Notification toast */
+  .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--panel);
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-size: 12px;
+    letter-spacing: 1px;
+    padding: 12px 20px;
+    z-index: 1000;
+    opacity: 0;
+    transform: translateX(20px);
+    transition: all 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(0); }
+
+  /* Glitch on title */
+  @keyframes glitch {
+    0%,96%,100% { text-shadow: var(--glow-cyan); transform: none; }
+    97% { text-shadow: 2px 0 var(--red), -2px 0 var(--green); transform: skewX(2deg); }
+    98% { text-shadow: -2px 0 var(--red), 2px 0 var(--green); transform: skewX(-2deg); }
+  }
+  .sys-title { animation: glitch 5s infinite; }
+
+  /* Responsive */
+  @media (max-width: 500px) {
+    .panel { padding: 20px 16px; }
+    .q-opt { padding: 12px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Landing Screen -->
+<div id="screen-landing" class="screen active">
+  <div class="container">
+    <div class="sys-header">
+      <div class="sys-badge">⚠ CLASSIFIED SYSTEM</div>
+      <div class="sys-title">BEHAVIORAL<br>PREDICTION ENGINE</div>
+      <div class="sys-version">SYSTEM v3.2 // DEEP ANALYSIS MODULE</div>
+      <div class="sys-subtitle">We analyze patterns most people don't notice.</div>
+    </div>
+
+    <div class="panel">
+      <span class="panel-label">// SYSTEM STATUS</span>
+      <div class="data-line">
+        <span class="data-key">NEURAL NETWORK</span>
+        <span class="data-val">● ONLINE</span>
+      </div>
+      <div class="data-line">
+        <span class="data-key">BEHAVIOR DATABASE</span>
+        <span class="data-val">14.7M PROFILES LOADED</span>
+      </div>
+      <div class="data-line">
+        <span class="data-key">PATTERN RECOGNITION</span>
+        <span class="data-val">92.4% ACCURACY</span>
+      </div>
+      <div class="data-line">
+        <span class="data-key">SESSION TRACKING</span>
+        <span class="data-val">● ACTIVE</span>
+      </div>
+    </div>
+
+    <div class="warning-box">
+      <div class="warning-icon">⚠</div>
+      <div class="warning-text">
+        This system uses <strong style="color:#ffe600">micro-behavioral analysis</strong> to predict personality traits, habits, and social patterns. Your interaction data is processed in real-time. Average prediction accuracy: <strong style="color:#ffe600">89–96%</strong>.
+      </div>
+    </div>
+
+    <button class="btn-start" onclick="startAnalysis()">
+      ▶ INITIATE ANALYSIS
+    </button>
+
+    <div style="text-align:center; margin-top:16px; font-size:10px; color:#1a4a5a; letter-spacing:2px;">
+      SECURE CONNECTION // END-TO-END ENCRYPTED // GDPR COMPLIANT
+    </div>
+  </div>
+</div>
+
+<!-- Question Screen -->
+<div id="screen-questions" class="screen">
+  <div class="container">
+    <div class="sys-header">
+      <div class="sys-title" style="font-size:22px;">SUBJECT PROFILING</div>
+      <div class="sys-version">BEHAVIORAL DATA COLLECTION IN PROGRESS</div>
+    </div>
+
+    <div class="panel">
+      <span class="panel-label">// INPUT MODULE</span>
+      <div class="q-progress" id="q-progress"></div>
+      <div class="q-number" id="q-number">QUERY 01 / 05</div>
+      <div class="q-text" id="q-text"></div>
+      <div class="q-options" id="q-options"></div>
+    </div>
+
+    <div style="font-size:10px; color:#1a4a5a; letter-spacing:2px; text-align:center;">
+      ANALYZING RESPONSE TIMING // KEYSTROKE PATTERN ACTIVE
+    </div>
+  </div>
+</div>
+
+<!-- Scan Screen -->
+<div id="screen-scan" class="screen">
+  <div class="container">
+    <div class="sys-header">
+      <div class="sys-badge">PROCESSING</div>
+      <div class="sys-title" style="font-size:24px;">RUNNING DEEP ANALYSIS</div>
+    </div>
+
+    <div class="scan-title">PLEASE WAIT — ANALYZING SUBJECT DATA</div>
+
+    <div class="scan-circle">
+      <div class="scan-ring"></div>
+      <div class="scan-ring"></div>
+      <div class="scan-ring"></div>
+      <div class="scan-percent" id="scan-percent">0%</div>
+    </div>
+
+    <div class="scan-tasks" id="scan-tasks"></div>
+  </div>
+</div>
+
+<!-- Result Screen -->
+<div id="screen-result" class="screen">
+  <div class="container">
+
+    <div class="result-header">
+      <div style="font-size:11px; letter-spacing:4px; color:#3a7a90; margin-bottom:12px;">ANALYSIS COMPLETE</div>
+      <div class="result-accuracy" id="result-score">94%</div>
+      <div class="result-label">PREDICTION ACCURACY</div>
+      <div class="result-status">✓ PROFILE SUCCESSFULLY DECODED</div>
+    </div>
+
+    <div class="panel">
+      <span class="panel-label">// BEHAVIORAL PREDICTIONS</span>
+      <div class="predictions" id="predictions"></div>
+    </div>
+
+    <div class="confidence-bar">
+      <div class="conf-header">
+        <span>CONFIDENCE INDEX</span>
+        <span id="conf-val">0%</span>
+      </div>
+      <div class="conf-track">
+        <div class="conf-fill" id="conf-fill"></div>
+      </div>
+    </div>
+
+    <div class="share-section">
+      <div class="share-card" id="share-card">
+        <div class="share-card-title">⚠ BEHAVIORAL PREDICTION SYSTEM v3.2</div>
+        <div class="share-card-score" id="share-score">94%</div>
+        <div class="share-card-text">THE MACHINE PREDICTED MY BEHAVIOR WITH <span id="share-score-text" style="color:var(--green)">94%</span> ACCURACY</div>
+        <div class="share-card-url">Try it yourself — Can it decode YOU?</div>
+      </div>
+
+      <button class="btn-share" onclick="copyShareText()">
+        ⎘ COPY SHARE TEXT
+      </button>
+      <button class="btn-retry" onclick="restart()">
+        ↺ RUN ANALYSIS AGAIN
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Ticker -->
+<div class="ticker">
+  <div class="ticker-inner" id="ticker"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────
+const questions = [
+  {
+    q: "What was your favorite subject in school?",
+    opts: ["📐 Math / Science", "📖 English / Literature", "🎨 Arts / Music", "🏃 PE / Sports"]
+  },
+  {
+    q: "When do you usually go to sleep on school nights?",
+    opts: ["Before 10 PM", "10 PM – 11 PM", "11 PM – 1 AM", "After 1 AM"]
+  },
+  {
+    q: "What kind of phone do you use?",
+    opts: ["📱 iPhone", "🤖 Android", "I switch between both", "I barely use my phone"]
+  },
+  {
+    q: "Where did you prefer to sit in class?",
+    opts: ["Front row — I want to focus", "Middle — comfortable zone", "Back bench obviously", "Wherever my friends sat"]
+  },
+  {
+    q: "Be honest. How often do you procrastinate?",
+    opts: ["Never — I'm very disciplined", "Sometimes, but I manage", "Often, but I still deliver", "Constantly — it's a lifestyle"]
+  }
+];
+
+const scanTasks = [
+  { label: "Scanning behavioral signatures...", icon: "◈" },
+  { label: "Analyzing personality matrix...", icon: "◈" },
+  { label: "Cross-referencing social patterns...", icon: "◈" },
+  { label: "Mapping cognitive tendencies...", icon: "◈" },
+  { label: "Running predictive algorithm...", icon: "◈" },
+  { label: "Compiling subject profile...", icon: "◈" }
+];
+
+const allPredictions = [
+  "You study with your phone face-up. Always.",
+  "There's a teacher you can't stand but pretend to like.",
+  "You stay up way later than you should every night.",
+  "You replay conversations in your head for hours after.",
+  "Someone in your class has you completely wrong.",
+  "You made up an excuse at least once this week.",
+  "You have a friend nobody knows is your closest one.",
+  "You laugh at things you definitely shouldn't.",
+  "You've fantasized about just disappearing for a day.",
+  "You're more driven than you let anyone see.",
+  "You judge people within 30 seconds of meeting them.",
+  "You have a whole personality nobody gets to see.",
+  "You act busier than you are to avoid certain people.",
+  "You've rehearsed arguments in your head that never happened.",
+  "You care a lot more about what people think than you admit.",
+  "You've lied about being fine at least once today.",
+  "You have a song that hits different when you're alone.",
+  "You secretly compare yourself to people constantly.",
+  "You're nicer to strangers than to people you know well.",
+  "You've googled something embarrassing in the last 24 hours.",
+  "You talk about sleep but never actually fix your schedule.",
+  "You have opinions you'd never say out loud in public.",
+  "You're procrastinating on something important right now.",
+  "You've pretended not to see a notification to avoid replying.",
+];
+
+const answers = [];
+let currentQ = 0;
+
+// ── TICKER ────────────────────────────────────────────
+function buildTicker() {
+  const items = [
+    "SUBJECT_4471 → <span>ANALYZED</span>",
+    "PREDICTION_CONFIDENCE → <span>92.3%</span>",
+    "BEHAVIOR_DB → <span>UPDATED</span>",
+    "NEW_PROFILE_LOADED → <span>TRUE</span>",
+    "PATTERN_MATCH → <span>FOUND</span>",
+    "SESSION_ACTIVE → <span>MONITORING</span>",
+    "NEURAL_NET_STATUS → <span>OPTIMAL</span>",
+    "SUBJECTS_TODAY → <span>2,847</span>",
+  ];
+  const doubled = [...items, ...items];
+  document.getElementById('ticker').innerHTML = doubled.map(
+    t => `<span class="ticker-item">${t}</span>`
+  ).join('');
+}
+
+// ── SCREENS ───────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+
+function startAnalysis() {
+  showScreen('questions');
+  renderQuestion();
+}
+
+// ── QUESTIONS ─────────────────────────────────────────
+function buildProgress() {
+  const el = document.getElementById('q-progress');
+  el.innerHTML = questions.map((_, i) => {
+    let cls = i < currentQ ? 'done' : i === currentQ ? 'active' : '';
+    return `<div class="q-pip ${cls}"></div>`;
+  }).join('');
+}
+
+function renderQuestion() {
+  const q = questions[currentQ];
+  document.getElementById('q-number').textContent = `QUERY 0${currentQ+1} / 0${questions.length}`;
+  document.getElementById('q-text').textContent = q.q;
+  document.getElementById('q-options').innerHTML = q.opts.map((o, i) =>
+    `<button class="q-opt" onclick="selectOption(${i})">
+      <span class="q-opt-key">0${i+1}</span>${o}
+    </button>`
+  ).join('');
+  buildProgress();
+}
+
+function selectOption(i) {
+  document.querySelectorAll('.q-opt').forEach((el, idx) => {
+    el.classList.toggle('selected', idx === i);
+  });
+  answers[currentQ] = i;
+  setTimeout(() => {
+    currentQ++;
+    if (currentQ < questions.length) {
+      renderQuestion();
+    } else {
+      runScan();
+    }
+  }, 350);
+}
+
+// ── SCAN ──────────────────────────────────────────────
+function runScan() {
+  showScreen('scan');
+  const tasksEl = document.getElementById('scan-tasks');
+  tasksEl.innerHTML = scanTasks.map((t, i) =>
+    `<div class="scan-task" id="task-${i}">
+      <span class="task-icon">${t.icon}</span>
+      <span class="task-label">${t.label}</span>
+      <div class="task-bar"><div class="task-bar-fill" id="bar-${i}"></div></div>
+    </div>`
+  ).join('');
+
+  let percentEl = document.getElementById('scan-percent');
+  let pct = 0;
+  let taskIndex = 0;
+
+  function activateTask(idx) {
+    if (idx >= scanTasks.length) return;
+    const task = document.getElementById(`task-${idx}`);
+    task.classList.add('running');
+    const bar = document.getElementById(`bar-${idx}`);
+    setTimeout(() => { bar.style.width = '100%'; }, 50);
+    setTimeout(() => {
+      task.classList.remove('running');
+      task.classList.add('done');
+      task.querySelector('.task-icon').textContent = '✓';
+    }, 900);
+  }
+
+  const interval = setInterval(() => {
+    pct += Math.random() * 4 + 1;
+    if (pct >= 100) pct = 100;
+    percentEl.textContent = Math.floor(pct) + '%';
+
+    const expectedTask = Math.floor(pct / (100 / scanTasks.length));
+    if (expectedTask > taskIndex && taskIndex < scanTasks.length) {
+      activateTask(taskIndex);
+      taskIndex++;
+    }
+
+    if (pct >= 100) {
+      clearInterval(interval);
+      setTimeout(showResult, 800);
+    }
+  }, 80);
+}
+
+// ── RESULT ────────────────────────────────────────────
+function showResult() {
+  const score = 89 + Math.floor(Math.random() * 8); // 89–96
+  document.getElementById('result-score').textContent = score + '%';
+  document.getElementById('share-score').textContent = score + '%';
+  document.getElementById('share-score-text').textContent = score + '%';
+  document.getElementById('conf-fill').style.width = score + '%';
+
+  // animate confidence val
+  let cv = 0;
+  const cvInterval = setInterval(() => {
+    cv += 2;
+    if (cv >= score) { cv = score; clearInterval(cvInterval); }
+    document.getElementById('conf-val').textContent = cv + '%';
+  }, 30);
+
+  // pick 5 random predictions
+  const shuffled = [...allPredictions].sort(() => Math.random() - 0.5).slice(0, 5);
+  document.getElementById('predictions').innerHTML = shuffled.map((p, i) =>
+    `<div class="pred-item" id="pred-${i}">
+      <span class="pred-check">✓</span>
+      <span class="pred-text">${p}</span>
+    </div>`
+  ).join('');
+
+  showScreen('result');
+
+  // stagger reveal
+  shuffled.forEach((_, i) => {
+    setTimeout(() => {
+      document.getElementById(`pred-${i}`)?.classList.add('visible');
+    }, 400 + i * 200);
+  });
+}
+
+// ── SHARE ─────────────────────────────────────────────
+function copyShareText() {
+  const score = document.getElementById('share-score').textContent;
+  const text = `⚠️ The Behavioral Prediction Machine analyzed me.\n\nAccuracy: ${score}\n\nIt predicted things about me I never told anyone.\n\nTry it if you dare — but you can't hide from it.`;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('✓ COPIED TO CLIPBOARD');
+  }).catch(() => {
+    showToast('SELECT TEXT ABOVE TO COPY');
+  });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function restart() {
+  currentQ = 0;
+  answers.length = 0;
+  showScreen('landing');
+}
+
+// ── INIT ──────────────────────────────────────────────
+buildTicker();
+</script>
+</body>
+</html>
