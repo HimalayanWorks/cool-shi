@@ -949,7 +949,9 @@ function showResult() {
 // ── SHARE ─────────────────────────────────────────────
 function copyShareText() {
   const score = document.getElementById('share-score').textContent;
-  const text = `⚠️ The Behavioral Prediction Machine analyzed me.\n\nAccuracy: ${score}\n\nIt predicted things about me I never told anyone.\n\nTry it if you dare — but you can't hide from it.`;
+  const predItems = document.querySelectorAll('.pred-text');
+  const predLines = Array.from(predItems).map(el => `  ✓ ${el.textContent}`).join('\n');
+  const text = `⚠️ The Behavioral Prediction Machine analyzed me.\n\nAccuracy: ${score}\n\nIt predicted:\n${predLines}\n\nIt knew things I never told anyone.\nTry it if you dare — but you can't hide from it.`;
   navigator.clipboard.writeText(text).then(() => {
     showToast('✓ COPIED TO CLIPBOARD');
   }).catch(() => {
